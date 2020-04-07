@@ -21,14 +21,6 @@ if (!require(ggplot2)) {
   install.packages("ggplot2", repos = "http://cran.us.r-project.org")
   require(ggplot2)
 }
-if (!require(tm)) {
-  install.packages("tm", repos = "http://cran.us.r-project.org")
-  require(tm)
-}
-if (!require(wordcloud)) {
-  install.packages("wordcloud", repos = "http://cran.us.r-project.org")
-  require(wordcloud)
-}
 if (!require(syuzhet)) {
   install.packages("syuzhet", repos = "http://cran.us.r-project.org")
   require(syuzhet)
@@ -45,10 +37,6 @@ if (!require(igraph)) {
   install.packages("igraph", repos = "http://cran.us.r-project.org")
   require(igraph)
 }
-if (!require(ggraph)) {
-  install.packages("ggraph", repos = "http://cran.us.r-project.org")
-  require(ggraph)
-}
 if (!require(readr)) {
   install.packages("readr", repos = "http://cran.us.r-project.org")
   require(readr)
@@ -57,14 +45,16 @@ if (!require(circlize)) {
   install.packages("circlize", repos = "http://cran.us.r-project.org")
   require(circlize)
 }
-if (!require(reshape2)) {
-  install.packages("reshape2", repos = "http://cran.us.r-project.org")
-  require(reshape2)
+if (!require(DT)) {
+  install.packages("DT", repos = "http://cran.us.r-project.org")
+  require(DT)
 }
 ```
 
 
 ```{r}
+library(syuzhet)
+lyrics <- read.csv(file.choose())
 lyrics_text <- lyrics$lyric
 #Removing punctations and alphanumeric content
 lyrics_text<- gsub('[[:punct:]]+', '', lyrics_text)
@@ -86,7 +76,6 @@ rownames(sentimentscores) <- NULL
 
 
 ```{r}
-
 # Plot for the cumulative sentiments
 ggplot(data=sentimentscores,aes(x=sentiment,y=Score, label=Score))+
 geom_bar(aes(fill=sentiment),stat = "identity")+
@@ -127,31 +116,112 @@ coord_flip()
 
 
 
+
+
+
 ```{r}
+# Load package
+#devtools::install_github("mattflor/chorddiag")
+library(chorddiag)
 
-lyric_sentiment <- tidy_lyrics %>% 
-inner_join(get_sentiments("nrc"),by="word")
+# Create dummy data
+m <- matrix(c(11975,  5871, 8916, 2868,
+              1951, 10048, 2060, 6171,
+              8010, 16145, 8090, 8045,
+              1013,   990,  940, 6907),
+            byrow = TRUE,
+            nrow = 4, ncol = 4)
 
-grid.col = c("2006" = "#E69F00", "2008" = "#56B4E9", "2010" = "#009E73", "2012" = "#CC79A7", "2014" = "#D55E00", "2017" = "#00D6C9", "anger" = "grey", "anticipation" = "grey", "disgust" = "grey", "fear" = "grey", "joy" = "grey", "sadness" = "grey", "surprise" = "grey", "trust" = "grey")
+# A vector of 4 colors for 4 groups
+haircolors <- c("black", "blonde", "brown", "red")
+dimnames(m) <- list(have = haircolors,
+                    prefer = c("black","blonde","brown","red"))
+groupColors <- c("#000000", "#FFDD89", "#957244", "#F26223")
 
-year_emotion <- lyric_sentiment %>%
-filter(!sentiment %in% c("positive", "negative")) %>%
-count(sentiment, year) %>%
-group_by(year, sentiment) %>%
-summarise(sentiment_sum = sum(n)) %>%
-ungroup()
+# Build the chord diagram:
+p <- chorddiag(m, groupColors = groupColors, groupnamePadding = 50)
+p
 
-#Reset the circular layout parameters
-circos.clear()
 
-#Setting the gap size
-circos.par(gap.after = c(rep(6, length(unique(year_emotion[[1]])) - 1), 15,
-rep(6, length(unique(year_emotion[[2]])) - 1), 15))
+```
 
-chordDiagram(year_emotion, grid.col = grid.col, transparency = .2)
-title("Relationship between emotion and song's year of release")
+```{r}
+#data chunk
+bf <- read.csv("Bf_Songs.csv")
+lyrics$"index" = c(1:length(lyrics$artist))
+ty_sentiment$"index" = c(1:length(ty_sentiment$anger))
+
+bf <- bf[order(bf$Track),]
+join <- data.frame(full_join(lyrics,ty_sentiment, by= "index"))
+songscore <- select(join,-c("index"))
+songscore <- select(songscore, -c("negative","positive"))
+songscore <- songscore[c(3,9:16)]
+#remove other column
+
+
+#get total sentiment score for each song
+songscore <- songscore%>%
+  group_by(track_title) %>%
+  summarise_each(funs(sum))
+
+
+
+#filter songs
+songscore2 <- songscore[songscore$track_title %in% bf$Track,]
+
+
+datatable(songscore2)
+
+datatable(bf)
+
+
+songscore3 <- cbind(songscore2,bf)
+songscore3
+
+
+```
+
+```{r}
+library(dplyr)
+titanic_tbl <- dplyr::tbl_df(Titanic)
+titanic_tbl
+titanic_tbl <- titanic_tbl %>%
+    mutate_at(vars(Class:Survived), funs(factor))
+titanic_tbl
+by_class_survival <- titanic_tbl %>%
+    group_by(Class, Survived) %>%
+    summarize(Count = sum(n))
+by_class_survival
+titanic.mat <- matrix(by_class_survival$Count, nrow = 4, ncol = 2)
+titanic.mat
+dimnames(titanic.mat ) <- list(Class = levels(titanic_tbl$Class),
+                               Survived = levels(titanic_tbl$Survived))
+titanic.mat
 ```
 
 
+```{r}
+groupColors <- c("#2171b5", "#6baed6", "#bdd7e7", "#bababa", "#d7191c", "#1a9641")
+chorddiag(titanic.mat, type = "bipartite", 
+          groupColors = groupColors,
+          tickInterval = 50)
+```
+```{r fig.dim= 20}
 
+
+songscore4 <- select (songscore3,-"track_title")
+songscores <- read.csv("songscore.csv")
+songscores <- songscores %>%
+    mutate_at(vars(BF:trust), funs(factor))
+songscores
+songscore.mat <- as.matrix(songscores[1:9,2:9],rownames=FALSE)
+colnames(songscore.mat)<- NULL
+
+songscore.mat <- matrix(apply(songscore.mat,2,FUN = as.numeric),nrow = 9, ncol = 8)
+songscore.mat
+dimnames(songscore.mat) <- list(BF = levels(songscores$BF),Sentiment = levels("Sentiments"))
+colnames(songscore.mat) <- colnames(songscores[,2:9])
+songscore.mat
+chorddiag(songscore.mat, type = "bipartite")
+```
 
