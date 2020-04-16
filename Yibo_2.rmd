@@ -1,0 +1,211 @@
+---
+title: "GET1030 Sentiment Analysis"
+output:
+  html_notebook:
+    highlight: kate
+    theme: cerulean
+     
+  html_document:
+    df_print: paged
+---
+
+This R Markdown document and HTML Notebook serves as coding documentation for the sentiment analysis portion of AY2019/20 Semester 2 GET1030 Computers and the Humanities group project. The topic is on Taylor Swift's lyrics, and sentiment analysis using NRC Dictionary from the syuzhet package was performed.
+
+### Group Members:
+  * Beacher Chen
+  * Elisa Yukie Yokoyama
+  * Lim Jun Wei
+  * Li Nam Kit, Alyssa
+  * Teo Mingjie
+
+***
+
+```{r echo=FALSE, message=FALSE, results="hide", warning=FALSE}
+if (!require(syuzhet)) {
+  install.packages("syuzhet", repos = "http://cran.us.r-project.org")
+  require(syuzhet)
+}
+if (!require(dplyr)) {
+  install.packages("dplyr", repos = "http://cran.us.r-project.org")
+  require(dplyr)
+}
+if (!require(DT)) {
+  install.packages("DT", repos = "http://cran.us.r-project.org")
+  require(DT)
+}
+if (!require(chorddiag)) {
+  install.packages("chorddiag", repos = "https://github.com/mattflor/chorddiag/")
+  require(chorddiag)
+}
+if (!require(ggplot2)) {
+  install.packages("ggplot2", repos = "http://cran.us.r-project.org")
+  require(ggplot2)
+}
+if (!require(tidytext)) {
+  install.packages("tidytext", repos = "http://cran.us.r-project.org")
+  require(tidytext)
+}
+```
+
+```{r}
+lyrics <- read.csv("taylor_swift_lyrics_Final.csv")
+
+# Removing punctations and alphanumeric content
+lyrics_text <- lyrics$lyric
+lyrics_text <- gsub('[[:punct:]]+', '', lyrics_text)
+lyrics_text <- gsub("([[:alpha:]])\1+", "", lyrics_text)
+
+# Using NRC Dictionary, obtain sentiment score
+# Run as separate chunk as it takes a while to generate
+sentiment <- get_nrc_sentiment(lyrics_text)
+
+```
+
+```{r}
+  # This section seeks to understand the overall sentiment distribution for all of Taylor Swift's songs
+
+# Create dataframe for sentiment scores, adjust headers
+
+sentimentscores<-data.frame(colSums(sentiment[,]))
+names(sentimentscores) <- "Score"
+sentimentscores <- cbind("Sentiment"= rownames(sentimentscores), sentimentscores)
+rownames(sentimentscores) <- NULL
+head(sentimentscores,5)
+
+# Plot Bar Graph
+ggplot(data=sentimentscores, aes(x=Sentiment, y=Score, label=Score)) +
+geom_bar(aes(fill=Sentiment), stat="identity") +
+geom_text(vjust=-1) +
+theme(legend.position="none") +
+xlab("Types of Sentiment") + ylab("Scores") + ylim(0,1750) +
+ggtitle("Sentiment Score Distribution") +
+theme(axis.text.x=element_text(size=10))
+```
+
+```{r}
+  # This section highlights key lyrics associated with each type of sentiment
+
+# Convert lyrics from sentence strings to characters
+lyrics$lyric <- as.character(lyrics$lyric)
+
+# Create one row per word
+lyrics_byword <- lyrics %>% 
+unnest_tokens(word,lyric)
+
+DT::datatable(head(lyrics_byword, 5))
+```
+
+```{r echo=FALSE}
+  # This section investigates the keywords that most reflect emotion in Taylor Swift's songs
+# Get total number of words in each song
+song_wordcount <- lyrics_byword %>% count(track_title)
+
+lyric_counts <- lyrics_byword %>%
+left_join(song_wordcount, by = "track_title") %>% 
+rename(total_words=n)
+
+# When (re-)running the code below, it requires installation of the NRC Word-Emotion Association Lexicon.
+# Select Yes in console, otherwise the code will continue waiting for a response.
+lyric_sentiment <- lyrics_byword %>% 
+inner_join(get_sentiments("nrc"), by="word")
+
+# Group by sentiment type, then find top 5 counts
+lyric_sentiment %>% 
+count(word, sentiment, sort=TRUE) %>% 
+group_by(sentiment) %>% top_n(n=5) %>% 
+ungroup() %>%
+
+ggplot(aes(x=reorder(word, n), y=n, fill=sentiment)) +
+geom_col(show.legend = FALSE) + 
+facet_wrap(~sentiment, scales="free") +
+xlab("") + ylab("") +
+ggtitle("Top 5 words per emotion with highest count") +
+coord_flip()
+
+```
+
+```{r fig.width=10, fig.height=7, echo=FALSE}
+  # This section investigates the most prominent emotions tied to each song, and highlights the top songs per emotion
+
+lyric_sentiment %>% 
+count(track_title, sentiment, sort=TRUE) %>% 
+group_by(sentiment) %>%
+top_n(n=5) %>% 
+ggplot(aes(x=reorder(track_title, n), y=n, fill=sentiment)) + 
+geom_bar(stat="identity", show.legend = FALSE) + 
+facet_wrap(~sentiment, scales="free", dir="v") + 
+xlab("") + ylab("") +
+ggtitle("Top 5 songs per emotion with highest score") +
+coord_flip() +
+theme(axis.text.y=element_text(size=8))
+```
+
+
+
+```{r warning=FALSE}
+
+
+
+# Dataframe with cumulative value of the sentiments
+sentimentscores<-data.frame(colSums(ty_sentiment[,]))
+
+# Dataframe with sentiment and score as columns
+names(sentimentscores) <- "Score"
+sentimentscores <- cbind("sentiment"=rownames(sentimentscores),sentimentscores)
+rownames(sentimentscores) <- NULL
+
+```
+
+```{r}
+#data chunk
+bf <- read.csv("Bf_Songs.csv")
+lyrics$"index" = c(1:length(lyrics$artist))
+ty_sentiment$"index" = c(1:length(ty_sentiment$anger))
+
+bf <- bf[order(bf$Track),]
+join <- data.frame(full_join(lyrics,ty_sentiment, by= "index"))
+songscore <- select(join,-c("index"))
+songscore <- select(songscore, -c("negative","positive"))
+songscore <- songscore[c(3,9:16)]
+
+#get total sentiment score for each song
+songscore <- songscore%>%
+  group_by(track_title) %>%
+  summarise_each(funs(sum))
+
+#filter songs
+songscore2 <- songscore[songscore$track_title %in% bf$Track,]
+
+
+
+
+datatable(bf)
+
+
+songscore3 <- cbind(songscore2,bf)
+datatable(songscore3)
+
+
+```
+
+```{r}
+library(chorddiag)
+songscore4 <- select (songscore3,-"track_title")
+songscores <- read.csv("songscore.csv")
+songscores <- songscores %>%
+    mutate_at(vars(BF:trust), funs(factor))
+songscores
+songscore.mat <- as.matrix(songscores[1:9,2:9],rownames=FALSE)
+colnames(songscore.mat)<- NULL
+
+songscore.mat <- matrix(apply(songscore.mat,2,FUN = as.numeric),nrow = 9, ncol = 8)
+songscore.mat
+dimnames(songscore.mat) <- list(Boyfriends = levels(songscores$BF),Sentiment = levels("Sentiments"))
+colnames(songscore.mat) <- colnames(songscores[,2:9])
+songscore.mat
+chorddiag(songscore.mat, type = "bipartite",width = 1000, height = 1000, showTicks = TRUE, groupThickness = 0.2, groupnameFontsize = 12, tickInterval = 20, categorynameFontsize = 20,categorynamePadding = 85,groupnamePadding = 15)
+```
+
+The chord diagram generated is interactive in design. You can hover over each element of the "Boyfriends" to isolate their respective contributions to each sentiment and vice versa.
+
+### END

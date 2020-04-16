@@ -1,60 +1,44 @@
 ---
-title: "R Notebook"
-output: html_notebook
+title: "GET1030 Sentiment Analysis"
+output:
+  html_notebook:
+    highlight: kate
+    theme: cerulean
+     
+  html_document:
+    df_print: paged
+author: A01514157E
+date: 4/16/2020
 ---
 
 
-```{r eval=FALSE, include=FALSE}
-if (!require(magrittr)) {
-  install.packages("magrittr", repos = "http://cran.us.r-project.org")
-  require(magrittr)
-}
-if (!require(stringr)) {
-  install.packages("stringr", repos = "http://cran.us.r-project.org")
-  require(stringr)
+```{r echo=FALSE, message=FALSE, results="hide", warning=FALSE}
+if (!require(syuzhet)) {
+  install.packages("syuzhet", repos = "http://cran.us.r-project.org")
+  require(syuzhet)
 }
 if (!require(dplyr)) {
   install.packages("dplyr", repos = "http://cran.us.r-project.org")
   require(dplyr)
 }
-if (!require(ggplot2)) {
-  install.packages("ggplot2", repos = "http://cran.us.r-project.org")
-  require(ggplot2)
-}
-if (!require(syuzhet)) {
-  install.packages("syuzhet", repos = "http://cran.us.r-project.org")
-  require(syuzhet)
-}
-if (!require(tidytext)) {
-  install.packages("tidytext", repos = "http://cran.us.r-project.org")
-  require(tidytext)
-}
-if (!require(tidyr)) {
-  install.packages("tidyr", repos = "http://cran.us.r-project.org")
-  require(tidyr)
-}
-if (!require(igraph)) {
-  install.packages("igraph", repos = "http://cran.us.r-project.org")
-  require(igraph)
-}
-if (!require(readr)) {
-  install.packages("readr", repos = "http://cran.us.r-project.org")
-  require(readr)
-}
-if (!require(circlize)) {
-  install.packages("circlize", repos = "http://cran.us.r-project.org")
-  require(circlize)
-}
 if (!require(DT)) {
   install.packages("DT", repos = "http://cran.us.r-project.org")
   require(DT)
 }
+if (!require(chorddiag)) {
+  install.packages("chorddiag", repos = "https://github.com/mattflor/chorddiag/")
+  require(chorddiag)
+}
+if (!require(ggplot2)) {
+  install.packages("ggplot2", repos = "http://cran.us.r-project.org")
+  require(ggplot2)
+}
 ```
 
 
-```{r}
-library(syuzhet)
-lyrics <- read.csv(file.choose())
+```{r warning=FALSE}
+
+lyrics <- read.csv("taylor_swift_lyrics_Final.csv")
 lyrics_text <- lyrics$lyric
 #Removing punctations and alphanumeric content
 lyrics_text<- gsub('[[:punct:]]+', '', lyrics_text)
@@ -69,79 +53,6 @@ sentimentscores<-data.frame(colSums(ty_sentiment[,]))
 names(sentimentscores) <- "Score"
 sentimentscores <- cbind("sentiment"=rownames(sentimentscores),sentimentscores)
 rownames(sentimentscores) <- NULL
-
-```
-
-
-
-
-```{r}
-# Plot for the cumulative sentiments
-ggplot(data=sentimentscores,aes(x=sentiment,y=Score, label=Score))+
-geom_bar(aes(fill=sentiment),stat = "identity")+
-geom_text(vjust= -1) +
-theme(legend.position="none")+
-xlab("Types of Sentiments")+ylab("Scores") + ylim(0,1750)+
-ggtitle("Sentiment Score Distribution")+
-theme(axis.text.x=element_text(size=10)) 
-```
-```{r}
-lyrics$lyric <- as.character(lyrics$lyric)
-
-tidy_lyrics <- lyrics %>% 
-unnest_tokens(word,lyric)
-
-song_wrd_count <- tidy_lyrics %>% count(track_title)
-
-lyric_counts <- tidy_lyrics %>%
-left_join(song_wrd_count, by = "track_title") %>% 
-rename(total_words=n)
-
-lyric_sentiment <- tidy_lyrics %>% 
-inner_join(get_sentiments("nrc"),by="word")
-
-lyric_sentiment %>% 
-count(word,sentiment,sort=TRUE) %>% 
-group_by(sentiment)%>%top_n(n=10) %>% 
-ungroup() %>%
-ggplot(aes(x=reorder(word,n),y=n,fill=sentiment)) +
-geom_col(show.legend = FALSE) + 
-facet_wrap(~sentiment,scales="free") +
-xlab("Sentiments") + ylab("Scores")+
-ggtitle("Top words used to express emotions and sentiments") +
-coord_flip()
-```
-
-
-
-
-
-
-
-
-```{r}
-# Load package
-#devtools::install_github("mattflor/chorddiag")
-library(chorddiag)
-
-# Create dummy data
-m <- matrix(c(11975,  5871, 8916, 2868,
-              1951, 10048, 2060, 6171,
-              8010, 16145, 8090, 8045,
-              1013,   990,  940, 6907),
-            byrow = TRUE,
-            nrow = 4, ncol = 4)
-
-# A vector of 4 colors for 4 groups
-haircolors <- c("black", "blonde", "brown", "red")
-dimnames(m) <- list(have = haircolors,
-                    prefer = c("black","blonde","brown","red"))
-groupColors <- c("#000000", "#FFDD89", "#957244", "#F26223")
-
-# Build the chord diagram:
-p <- chorddiag(m, groupColors = groupColors, groupnamePadding = 50)
-p
-
 
 ```
 
@@ -182,33 +93,7 @@ songscore3
 ```
 
 ```{r}
-library(dplyr)
-titanic_tbl <- dplyr::tbl_df(Titanic)
-titanic_tbl
-titanic_tbl <- titanic_tbl %>%
-    mutate_at(vars(Class:Survived), funs(factor))
-titanic_tbl
-by_class_survival <- titanic_tbl %>%
-    group_by(Class, Survived) %>%
-    summarize(Count = sum(n))
-by_class_survival
-titanic.mat <- matrix(by_class_survival$Count, nrow = 4, ncol = 2)
-titanic.mat
-dimnames(titanic.mat ) <- list(Class = levels(titanic_tbl$Class),
-                               Survived = levels(titanic_tbl$Survived))
-titanic.mat
-```
-
-
-```{r}
-groupColors <- c("#2171b5", "#6baed6", "#bdd7e7", "#bababa", "#d7191c", "#1a9641")
-chorddiag(titanic.mat, type = "bipartite", 
-          groupColors = groupColors,
-          tickInterval = 50)
-```
-```{r fig.dim= 20}
-
-
+library(chorddiag)
 songscore4 <- select (songscore3,-"track_title")
 songscores <- read.csv("songscore.csv")
 songscores <- songscores %>%
@@ -219,9 +104,9 @@ colnames(songscore.mat)<- NULL
 
 songscore.mat <- matrix(apply(songscore.mat,2,FUN = as.numeric),nrow = 9, ncol = 8)
 songscore.mat
-dimnames(songscore.mat) <- list(BF = levels(songscores$BF),Sentiment = levels("Sentiments"))
+dimnames(songscore.mat) <- list(Boyfriends = levels(songscores$BF),Sentiment = levels("Sentiments"))
 colnames(songscore.mat) <- colnames(songscores[,2:9])
 songscore.mat
-chorddiag(songscore.mat, type = "bipartite")
+chorddiag(songscore.mat, type = "bipartite",width = 1000, height = 1000, showTicks = TRUE, groupThickness = 0.2, groupnameFontsize = 12, tickInterval = 20, categorynameFontsize = 20,categorynamePadding = 85,groupnamePadding = 15)
 ```
 
